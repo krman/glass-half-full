@@ -12,25 +12,24 @@ SIFT = cv2.SIFT()
 def find_features(filename):
     img = cv2.imread(filename,0)
     kps,ds = SIFT.detectAndCompute(img,None)
-    return img,kps,ds
+    return kps,ds
 
 
 def find_all_features(prefix):
     pattern = prefix + '*.jpg'
     for name in sorted(glob.glob(pattern)):
-	img,kps,ds = find_features(name)
-	yield name,img,kps,ds
+	kps,ds = find_features(name)
+	yield name,kps,ds
 
 
 def save_features(filename, features):
-    """ features is a list of (kps,ds) pairs """
+    """ features is a list of (name,kps,ds) pairs """
 
-    serialised = []
-    for kps,ds in features:
-	for i,kp in enumerate(kps):
-	    d = ds[i]
-	    serialised.append((kp.pt, kp.size, kp.angle, kp.response, 
-		kp.octave, kp.class_id, d))
+    serialised = {}
+    for name,kps,ds in features:
+	kps_serial = [(kp.pt[0], kp.pt[1], kp.size, kp.angle, kp.response,
+		kp.octave, kp.class_id) for kp in kps]
+	serialised[name] = (kps_serial,ds)
 
     with open(filename, 'wb') as f:
 	pickle.dump(serialised, f)
@@ -38,9 +37,16 @@ def save_features(filename, features):
 
 def load_features(filename):
     with open(filename, 'r') as f:
-	pass
+	features = pickle.load(f)
+	for name in features:
+	    kps_serial,ds = features[name]
+	    kps = [cv2.KeyPoint(*kp) for kp in kps_serial]
+	    features[name] = (kps,ds)
+
+    return features
 
 
 if __name__ == '__main__':
-    filenames,features = find_all_features('small_cup')
+    features = list(find_all_features('images/small_cup'))
     save_features('small_features', features)
+    print load_features('small_features')

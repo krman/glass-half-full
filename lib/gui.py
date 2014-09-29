@@ -2,13 +2,15 @@ import sys
 import re
 
 import Tkinter as tk
+import tkFileDialog
 
 import matplotlib
 from matplotlib.figure import Figure
 from numpy import arange, sin, pi
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from features import *
+import cv2
+import lib
 
 
 matplotlib.use('TkAgg')
@@ -44,11 +46,13 @@ class FeaturesMode(tk.Frame):
 
 	self.prefix_button = tk.Button(self.prefix_frame, text="Find features",
 		command=self.find_features)
+	self.load_button = tk.Button(self.prefix_frame, 
+		text="Load saved features...", command=self.load_features)
 
 	# Status (display and text)
 	self.status_frame = tk.Frame(self)
 
-	self.fig = Figure(figsize=(5,4), dpi=100)
+	self.fig = Figure(figsize=(4,3), dpi=100)
 	self.axes = self.fig.add_subplot(111)
 	t = arange(0.0,3.0,0.01)
 	s = sin(2*pi*t)
@@ -57,31 +61,25 @@ class FeaturesMode(tk.Frame):
 	self.canvas.show()
 
 	self.scrollbar = tk.Scrollbar(self.status_frame)
-
-	self.status_text = tk.Text(self.status_frame, width=40, 
+	self.status = tk.Listbox(self.status_frame, width=40, 
 		yscrollcommand=self.scrollbar.set)
-	self.status_text.insert(tk.END, "hello, ")
-	self.status_text.insert(tk.END, "world")
-	self.status_text.config(state=tk.DISABLED)
-
-	self.scrollbar.config(command=self.status_text.yview)
+	self.status.bind("<<ListboxSelect>>", self.select_feature)
+	self.scrollbar.config(command=self.status.yview)
 
 	# Save feature controls
 	self.save_frame = tk.Frame(self)
-	self.save_label = tk.Label(self.save_frame, text="Filename to save")
-	self.save_entry = tk.Entry(self.save_frame)
-	self.save_entry.insert(0, "features/")
-	self.save_button = tk.Button(self.save_frame, text="Save features")
+	self.save_label = tk.Label(self.save_frame, text="")
+	self.save_button = tk.Button(self.save_frame, text="Save features...",
+		command=self.save_features)
 
 
     def draw(self):
-
-	# Pack image prefix controls
-	self.prefix_frame.pack(side=tk.TOP, fill=tk.X)
-	self.prefix_label.pack(side=tk.LEFT, padx=20, pady=20, anchor=tk.N)
-	self.prefix_entry.pack(side=tk.LEFT, padx=20, pady=20, 
-		anchor=tk.N, expand=True, fill=tk.X)
-	self.prefix_button.pack(side=tk.RIGHT, padx=20, pady=20, anchor=tk.N)
+	# Pack extract/load features controls
+	self.prefix_frame.pack(side=tk.TOP, fill=tk.X, pady=20, anchor=tk.N)
+	self.prefix_label.pack(side=tk.LEFT, padx=(20,0))
+	self.prefix_entry.pack(side=tk.LEFT, padx=20, expand=True, fill=tk.X)
+	self.load_button.pack(side=tk.RIGHT, padx=20)
+	self.prefix_button.pack(side=tk.RIGHT, padx=(0,20))
 
 	# Pack status (display and text)
 	self.status_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, 
@@ -89,50 +87,97 @@ class FeaturesMode(tk.Frame):
 	self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 	self.canvas._tkcanvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
 	self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-	self.status_text.pack(side=tk.RIGHT, fill=tk.Y, padx=20, anchor=tk.N)
+	self.status.pack(side=tk.RIGHT, fill=tk.Y, anchor=tk.N)
 
-	# Pack save feature controls
+	# Pack save features controls
 	self.save_frame.pack(side=tk.TOP, fill=tk.X)
-	self.save_label.pack(side=tk.LEFT, padx=20, pady=20, anchor=tk.N)
-	self.save_entry.pack(side=tk.LEFT, padx=20, pady=20, 
-		anchor=tk.N, expand=True, fill=tk.X)
 	self.save_button.pack(side=tk.RIGHT, padx=20, pady=20, anchor=tk.N)
+	self.save_label.pack(side=tk.RIGHT)
 
 
     def find_features(self, event=None):
-	self.status_text.config(state=tk.NORMAL)
+	self.save_label.config(text="")
 	prefix = self.prefix_entry.get()
-	self.status_text.delete(1.0, tk.END)
-	text = "Using prefix {0}\n".format(prefix)
-	self.status_text.insert(tk.END, text)
+	self.status.delete(0, tk.END)
+	text = "Using prefix {0}".format(prefix)
+	self.status.insert(tk.END, text)
 
-	features = []
+	self.features = []
 	count = 0
-	for name,img,kps,ds in find_all_features(prefix):
-	    self.status_text.insert(tk.END, "\n")
-	    self.status_text.insert(tk.END, name)
-	    self.status_text.update_idletasks()
-	    self.status_text.see(tk.END)
-	    features.append((kps,ds))
+	for name,kps,ds in lib.features.find_all_features(prefix):
+	    self.status.insert(tk.END, name)
+	    self.status.update_idletasks()
+	    self.status.see(tk.END)
 	    count += len(kps)
+	    img = cv2.imread(name,0)
+	    self.features.append((img,name,kps,ds))
+	    self.display_features(img,kps)
+	
+	text = "{0} images processed".format(len(self.features))
+	self.status.insert(tk.END, text)
+	text = "{0} features found".format(count)
+	self.status.insert(tk.END, text)
+	self.status.see(tk.END)
 
-	text = "\n\n{0} images processed\n{1} features found".format(
-		len(features), count)
-	self.status_text.insert(tk.END, text)
-	self.status_text.see(tk.END)
-	self.status_text.config(state=tk.DISABLED)
 
+    def select_feature(self, event):
+	selected = int(self.status.curselection()[0])
+	size = self.status.size()
+
+	if selected not in [size-1, size-2, 0]:
+	    index = selected - 1
+	    img,name,kps,ds = self.features[index]
+	    self.display_features(img, kps)
+
+
+    def display_features(self, img, kps):
 	self.axes.clear()
-	t = arange(0.0,3.0,0.01)
-	s = sin(3*pi*t)
-
-	self.axes.plot(t,s)
+	img = cv2.drawKeypoints(img, kps)
+	self.axes.imshow(img)
 	self.canvas.draw()
 
-	self.save_entry.delete(0, tk.END)
-	suggested = re.sub("^images/", "features/", prefix) + ".txt"
-	self.save_entry.insert(tk.END, suggested)
+
+    def save_features(self, event=None):
+	filename = tkFileDialog.asksaveasfilename(
+		initialdir='features', defaultextension='.txt')
+	if not filename:
+	    return
+
+	features = [(n,k,d) for i,n,k,d in self.features]
+	lib.features.save_features(filename, features)
+	self.save_label.config(text="Saved")
+
+
+    def load_features(self, event=None):
+	self.save_label.config(text="")
+	filename = tkFileDialog.askopenfilename(
+		initialdir='features', defaultextension='.txt')
+	if not filename:
+	    return
+
+	features = lib.features.load_features(filename)
 	
+	self.status.delete(0, tk.END)
+	text = "Loading from {0}".format(filename)
+	self.status.insert(tk.END, text)
+
+	self.features = []
+	count = 0
+	for name in features:
+	    kps,ds = features[name]
+	    self.status.insert(tk.END, name)
+	    self.status.update_idletasks()
+	    self.status.see(tk.END)
+	    count += len(kps)
+	    img = cv2.imread(name,0)
+	    self.features.append((img,name,kps,ds))
+	
+	text = "{0} images processed".format(len(self.features))
+	self.status.insert(tk.END, text)
+	text = "{0} features found".format(count)
+	self.status.insert(tk.END, text)
+	self.status.see(tk.END)
+
 
 
 class SceneMode(tk.Frame):
@@ -149,7 +194,7 @@ class SearchMode(tk.Frame):
 	tk.Frame.__init__(self, *args, **kwargs)
 
     def draw(self):
-	print "drawing search"
+	pass
 
 
 
