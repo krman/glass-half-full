@@ -35,7 +35,7 @@ def drawMatches(img1, kp1, img2, kp2, matches):
 
     # Extract and plot (x,y) pairs and transform for second image
     for m in matches:
-	print m.imgIdx, m.trainIdx, m.queryIdx, len(kp1), len(kp2)
+	#print m.imgIdx, m.trainIdx, m.queryIdx, len(kp1), len(kp2)
 	x1,y1 = kp1[m.queryIdx].pt
 	x2,y2 = kp2[m.trainIdx].pt
 	x2 += offset
@@ -47,10 +47,9 @@ def drawMatches(img1, kp1, img2, kp2, matches):
 	    #format = 'b-'
 	else:
 	    format = 'y-'
-	plt.plot([x1,x2],[y1,y2],format)
+	#plt.plot([x1,x2],[y1,y2],format)
 
     plt.show()
-
 
 
 def drawMatchesKnn(img1, kp1, img2, kp2, matches, matchColor=(0,255,0),
@@ -58,3 +57,12 @@ def drawMatchesKnn(img1, kp1, img2, kp2, matches, matchColor=(0,255,0),
     print matches[0]
     print dir(matches[0][0])
     compareKeypoints(img1, kp1, img2, kp2, color=singlePointColor)
+
+
+def draw_matching_scene_keypoints(scene, kps, matches):
+    plt.imshow(scene)
+    for m in matches:
+	print m
+	x,y = kps[m.trainIdx].pt
+	plt.plot(x,y,'ro')
+    plt.show()

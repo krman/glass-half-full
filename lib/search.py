@@ -6,6 +6,12 @@ from visualise import drawMatches, draw_matching_scene_keypoints
 from features import load_features
 
 
+def calculate_disparity_map(imgL, imgR):
+    stereo = cv2.StereoBM(cv2.STEREO_BM_BASIC_PRESET, 16, 5)
+    disparity = stereo.compute(imgL, imgR)
+    return disparity
+
+
 def search_scene(scene, cups):
     img1 = cv2.imread('images/small_cup_up_1.jpg',0)
     img2 = cv2.imread(scene,0)
@@ -74,3 +80,16 @@ def search_scene(scene, cups):
     img3 = cv2.drawKeypoints(img2, kp2)
     cv2.imwrite("hello.jpg", img3)
     #img3 = drawMatches(img1,kp1,img2,kp2,good)
+
+
+
+if __name__ == '__main__':
+    imgL = cv2.imread("scenes/38_left_cam.jpg",0)
+    imgR = cv2.imread("scenes/38_right_cam.jpg",0)
+
+    block_matcher = cv2.StereoBM(cv2.STEREO_BM_BASIC_PRESET, 32, 15)
+    disp = block_matcher.compute(imgL, imgR, disptype=cv2.CV_32F)
+    norm_coeff = 255 / disp.max()
+    cv2.imshow("disparity", disp * norm_coeff / 255)
+    cv2.waitKey()
+
