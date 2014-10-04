@@ -12,39 +12,6 @@ from matplotlib import pyplot as plt
 SIFT = cv2.SIFT
 
 
-def get_fundamental_matrix(left_image, right_image):
-    img1 = cv2.imread(left_image, 0)
-    img2 = cv2.imread(right_image, 0)
-
-    kp1, des1 = SIFT.detectAndCompute(img1,None)
-    kp2, des2 = SIFT.detectAndCompute(img2,None)
-
-    # FLANN parameters
-    FLANN_INDEX_KDTREE = 0
-    index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
-    search_params = dict(checks=50)
-
-    flann = cv2.FlannBasedMatcher(index_params,search_params)
-    matches = flann.knnMatch(des1,des2,k=2)
-
-    good = []
-    pts1 = []
-    pts2 = []
-
-    # ratio test as per Lowe's paper
-    for i,(m,n) in enumerate(matches):
-        if m.distance < 0.8*n.distance:
-            good.append(m)
-            pts2.append(kp2[m.trainIdx].pt)
-            pts1.append(kp1[m.queryIdx].pt)
-
-    pts1 = np.array(pts1, dtype='float32')
-    pts2 = np.array(pts2, dtype='float32')
-
-    F, mask = cv2.findFundamentalMat(pts1,pts2,cv2.FM_LMEDS)
-    return F
-
-
 def calibrate_stereo(left_filenames, right_filenames):
     left_images = sorted(glob.glob(left_filenames))
     right_images = sorted(glob.glob(right_filenames))
@@ -106,11 +73,54 @@ def calibrate_stereo(left_filenames, right_filenames):
     mapsR = cv2.initUndistortRectifyMap(matrixR, distR, R2, P2,
 	    image_size, cv2.CV_32FC1)
 
+    # Convert maps to fixed-point representation (faster)
+    mapsL = cv2.convertMaps(mapsL[0], mapsL[1], cv2.CV_32FC1)
+    mapsR = cv2.convertMaps(mapsR[0], mapsR[1], cv2.CV_32FC1)
+
     calib = {
 	"intrinsicL": matrixL, "intrinsicR": matrixR,
-	"mapsL": mapsL, "mapsR": mapsR
+	"mapsL": mapsL, "mapsR": mapsR,
+	"R1": R1, "R2": R2, "P1": P1, "P2": P2, "Q": Q,
+	"roiL": roiL, "roiR": roiR
     }
     yield True, calib, None, None
+
+
+def rectify_image(map1, map2, image):
+    return cv2.remap(image, map1, map2, cv2.INTER_NEAREST)
+
+
+def get_fundamental_matrix(left_image, right_image):
+    img1 = cv2.imread(left_image, 0)
+    img2 = cv2.imread(right_image, 0)
+
+    kp1, des1 = SIFT.detectAndCompute(img1,None)
+    kp2, des2 = SIFT.detectAndCompute(img2,None)
+
+    # FLANN parameters
+    FLANN_INDEX_KDTREE = 0
+    index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+    search_params = dict(checks=50)
+
+    flann = cv2.FlannBasedMatcher(index_params,search_params)
+    matches = flann.knnMatch(des1,des2,k=2)
+
+    good = []
+    pts1 = []
+    pts2 = []
+
+    # ratio test as per Lowe's paper
+    for i,(m,n) in enumerate(matches):
+        if m.distance < 0.8*n.distance:
+            good.append(m)
+            pts2.append(kp2[m.trainIdx].pt)
+            pts1.append(kp1[m.queryIdx].pt)
+
+    pts1 = np.array(pts1, dtype='float32')
+    pts2 = np.array(pts2, dtype='float32')
+
+    F, mask = cv2.findFundamentalMat(pts1,pts2,cv2.FM_LMEDS)
+    return F
 
 
 def save_calibration(filename, calib):

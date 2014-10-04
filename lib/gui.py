@@ -177,7 +177,6 @@ class CalibrateMode(tk.Frame):
 	self.canvas.draw()
 
 
-
     def load_calibration(self):
 	filename = tkFileDialog.askopenfilename(
 		defaultextension='.txt', initialdir='calibration',
@@ -210,14 +209,13 @@ class CalibrateMode(tk.Frame):
 
 
 
-
-
 class TrainingMode(tk.Frame):
     def __init__(self, *args, **kwargs):
 	tk.Frame.__init__(self, *args, **kwargs)
 
     def draw(self):
 	pass
+
 
 
 class FeaturesMode(tk.Frame):
@@ -450,6 +448,20 @@ class SearchMode(tk.Frame):
 	self.save_image_button.pack(side=tk.RIGHT)
 
 
+    def draw_image(self, x, y):
+	if x == 0 and y == 0:
+	    img = self.left
+	elif x == 0 and y == 1:
+	    img = self.right
+	elif x == 1 and y == 1:
+	    img = self.final
+
+	self.axes[x][y].clear()
+	self.axes[x][y].imshow(img)
+	self.axes[x][y].set_axis_off()
+	self.canvas.draw()
+
+
     def load_image(self, axis):
 	filename = tkFileDialog.askopenfilename(
 		initialdir='scenes', defaultextension='.jpg',
@@ -458,10 +470,6 @@ class SearchMode(tk.Frame):
 	    return
 
 	img = cv2.imread(filename)
-	self.axes[0][axis].clear()
-	self.axes[0][axis].imshow(img)
-	self.axes[0][axis].set_axis_off()
-	self.canvas.draw()
 
 	if axis == 0:
 	    which = "left"
@@ -470,6 +478,7 @@ class SearchMode(tk.Frame):
 	    which = "right"
 	    self.right = img
 
+	self.draw_image(0, axis)
 	short = filename.split(os.path.sep)[-1]
 	text = "Using {0} for {1} image".format(short, which)
 	self.status.insert(tk.END, text)
@@ -484,7 +493,6 @@ class SearchMode(tk.Frame):
 	    return
 
 	self.calib = load_calibration(filename)
-	print self.calib
 
 	short = filename.split(os.path.sep)[-1]
 	text = "Using {0} for calibration".format(short)
@@ -496,9 +504,6 @@ class SearchMode(tk.Frame):
 	imgL = cv2.cvtColor(self.left, cv2.COLOR_BGR2GRAY)
 	imgR = cv2.cvtColor(self.right, cv2.COLOR_BGR2GRAY)
 	disparity = calculate_disparity_map(imgL, imgR)
-	print disparity
-	print disparity.max()
-	print disparity / disparity.max()
 	norm = 255 / disparity.max()
 	self.axes[1][0].clear()
 	self.axes[1][0].imshow(disparity)
@@ -506,13 +511,38 @@ class SearchMode(tk.Frame):
 	self.canvas.draw()
 
 
+    def rectify_source_images(self):
+	map1, map2 = self.calib["mapsL"]
+	self.left = rectify_image(map1, map2, self.left)
+	self.draw_image(0,0)
+	map1, map2 = self.calib["mapsR"]
+	self.right = rectify_image(map1, map2, self.right)
+	self.draw_image(0,1)
+
+
+    def list_cups(self):
+	for cup in self.cups:
+	    text = "{type} cup / {location} / {fill} / {orientation}".format(**cup)
+	    self.status.insert(tk.END, text)
+	self.status.see(tk.END)
+
+
     def find_cups(self):
 	self.level_index = self.level_box.current()
 	level = self.levels[self.level_index]
+	self.status.insert(tk.END, "")
 	text = "Starting level {0}: '{1}'".format(self.level_index+1, level)
 	self.status.insert(tk.END, text)
 
-	self.find_disparity_map()
+	self.rectify_source_images()
+	disparity = self.find_disparity_map()
+	img = cv2.cvtColor(self.right, cv2.COLOR_BGR2GRAY)
+	self.cups, self.final = search_scene(img, disparity)
+	
+	text = "Found {0} cups".format(len(self.cups))
+	self.status.insert(tk.END, text)
+	self.draw_image(1,1)
+	self.list_cups()
 
 
     def save_generic(self, event=None, ext=".txt"):
