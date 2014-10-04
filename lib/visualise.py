@@ -16,7 +16,6 @@ def compare_keypoints(img1, kp1, img2, kp2, color=(255,0,0)):
     r2 = img2.shape[0]
     if r1 < r2:                                                           
         z = np.zeros((r2-r1,img1.shape[1]))
-	print z.shape, img1.shape
         img1 = np.concatenate((img1, z),axis=0)
     elif rows1 > rows2:                                                         
 	img2 = np.concatenate((img2,np.zeros((r1-r2,img2.shape[1],3))),axis=0)

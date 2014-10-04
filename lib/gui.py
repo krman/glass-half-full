@@ -449,15 +449,17 @@ class SearchMode(tk.Frame):
 
 
     def draw_image(self, x, y):
+	kwargs = {}
 	if x == 0 and y == 0:
 	    img = self.left
 	elif x == 0 and y == 1:
 	    img = self.right
 	elif x == 1 and y == 1:
+	    kwargs["cmap"] = plt.cm.Greys_r
 	    img = self.final
 
 	self.axes[x][y].clear()
-	self.axes[x][y].imshow(img)
+	self.axes[x][y].imshow(img, **kwargs)
 	self.axes[x][y].set_axis_off()
 	self.canvas.draw()
 
