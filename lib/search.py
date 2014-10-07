@@ -30,24 +30,24 @@ def test_polygon(polygon):
     # Reasonable area?
     area = 0
     for p1,p2 in lines:
-	x1,y1 = p1[0][0], p1[0][1]
-	x2,y2 = p2[0][0], p2[0][1]
-	h = (y1 + y2) / 2
-	w = x2 - x1
-	area += h * w
+        x1,y1 = p1[0][0], p1[0][1]
+        x2,y2 = p2[0][0], p2[0][1]
+        h = (y1 + y2) / 2
+        w = x2 - x1
+        area += h * w
     
     if area < 10000 or area > 100000:
-	return False
+        return False
 
     return True
 
 
 def calculate_disparity_map(imgL, imgR):
     stereo = cv2.StereoSGBM(
-	minDisparity=64,
-	numDisparities=176,
-	SADWindowSize=7,
-	fullDP=True
+        minDisparity=64,
+        numDisparities=176,
+        SADWindowSize=7,
+        fullDP=True
     )
     disparity = stereo.compute(imgL, imgR)
     return disparity
@@ -62,34 +62,34 @@ def locate_cup(scene, prefix):
 
     # Load saved features
     try:
-	filename = "features/{0}.txt".format(prefix)
-	features = load_features(filename)
+        filename = "features/{0}.txt".format(prefix)
+        features = load_features(filename)
 
-	kp1 = []
-	matched = []
-	for name in features:
-	    kp1, des1 = features[name]
+        kp1 = []
+        matched = []
+        for name in features:
+            kp1, des1 = features[name]
 
-	    # Match features with FLANN-based matcher
-	    FLANN_INDEX_KDTREE = 0
-	    index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
-	    search_params = dict(checks = 50)
+            # Match features with FLANN-based matcher
+            FLANN_INDEX_KDTREE = 0
+            index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+            search_params = dict(checks = 50)
 
-	    flann = cv2.FlannBasedMatcher(index_params, search_params)
-	    matches = flann.knnMatch(des1, des2, k=2)
+            flann = cv2.FlannBasedMatcher(index_params, search_params)
+            matches = flann.knnMatch(des1, des2, k=2)
 
-	    # Only store close-enough matches (Lowe's ratio test)
-	    good = []
-	    for m,n in matches:
-		if m.distance < 0.7*n.distance:
-		    good.append(m)
+            # Only store close-enough matches (Lowe's ratio test)
+            good = []
+            for m,n in matches:
+                if m.distance < 0.7*n.distance:
+                    good.append(m)
 
-	    # If this is better than the old best for this category, store it
-	    if len(good) > 0:
-		matched.append((name,good))
+            # If this is better than the old best for this category, store it
+            if len(good) > 0:
+                matched.append((name,good))
 
     except IOError:
-	return []
+        return []
 
     # Sort images by most good matches
     matched.sort(key=lambda x: len(x[1]), reverse=True)
@@ -97,40 +97,40 @@ def locate_cup(scene, prefix):
     # Work through images until acceptable homography is found
     found = False
     for name, matches in matched:
-	kp1, des1 = features[name]
-	img1 = cv2.imread(name, 0)
+        kp1, des1 = features[name]
+        img1 = cv2.imread(name, 0)
 
-	# Find homography for this image
-	if len(matches) < 4:
-	    return []
+        # Find homography for this image
+        if len(matches) < 4:
+            return []
 
-	src_pts = np.float32(
-		[kp1[m.queryIdx].pt for m in matches]).reshape(-1,1,2)
-	dst_pts = np.float32(
-		[kp2[m.trainIdx].pt for m in matches]).reshape(-1,1,2)
+        src_pts = np.float32(
+                [kp1[m.queryIdx].pt for m in matches]).reshape(-1,1,2)
+        dst_pts = np.float32(
+                [kp2[m.trainIdx].pt for m in matches]).reshape(-1,1,2)
 
-	M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 3)
-	matchesMask = mask.ravel().tolist()
+        M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 3)
+        matchesMask = mask.ravel().tolist()
 
-	# Reject upside-down images (matched separately)
-	if M[0][0] < 0:
-	    continue
+        # Reject upside-down images (matched separately)
+        if M[0][0] < 0:
+            continue
 
-	h,w = img1.shape
-	pts = np.float32([[0,0],[0,h-1],[w-1,h-1],[w-1,0]]).reshape(-1,1,2)
-	dst = cv2.perspectiveTransform(pts,M)
+        h,w = img1.shape
+        pts = np.float32([[0,0],[0,h-1],[w-1,h-1],[w-1,0]]).reshape(-1,1,2)
+        dst = cv2.perspectiveTransform(pts,M)
 
-	# Reject bad polygons (too big, too small, not approximately rectangle)
-	if not test_polygon(dst):
-	    continue
+        # Reject bad polygons (too big, too small, not approximately rectangle)
+        if not test_polygon(dst):
+            continue
 
-	# Match is acceptable
-	found = True
-	good = matches
-	break
+        # Match is acceptable
+        found = True
+        good = matches
+        break
 
     if not found:
-	return []
+        return []
 
     matches = [m for i,m in enumerate(good) if matchesMask[i]]
     #img3 = draw_matches(img1, kp1, img2, kp2, matches)
@@ -152,39 +152,39 @@ def search_scene(img, disparity):
 
     # Locate cups and glasses in image space
     for cup in ["small", "medium", "large", "champagne"]:
-	for orientation in ["up", "down"]:
-	    for fill in ["empty", "half", "full"]:
-		if fill == "half" and "cup" != "champagne" \
-			or orientation == "down" and fill != "empty":
-		    continue
+        for orientation in ["up", "down"]:
+            for fill in ["empty", "half", "full"]:
+                if fill == "half" and "cup" != "champagne" \
+                        or orientation == "down" and fill != "empty":
+                    continue
 
-		prefix = "{0}_{1}_{2}".format(cup, orientation, fill)
-		dst = locate_cup(scene, prefix)
-		if not dst:
-		    continue
+                prefix = "{0}_{1}_{2}".format(cup, orientation, fill)
+                dst = locate_cup(scene, prefix)
+                if not dst:
+                    continue
 
-		cup = {
-		    "type": cup,
-		    "location": (1,1,1),
-		    "dst": dst[0],
-		    "fill": fill,
-		    "orientation": orientation
-		}
-		found_cups.append(cup)
+                cup = {
+                    "type": cup,
+                    "location": (1,1,1),
+                    "dst": dst[0],
+                    "fill": fill,
+                    "orientation": orientation
+                }
+                found_cups.append(cup)
 
     # Sort out double bookings
-		    
+                    
     # Mark up image
     for cup in found_cups:
-	dst = cup["dst"]
-	cv2.polylines(img, [np.int32(dst)], True, 255, 3)
+        dst = cup["dst"]
+        cv2.polylines(img, [np.int32(dst)], True, 255, 3)
     
     return found_cups, final_image
 
 
 
 if __name__ == '__main__':
-    img = cv2.imread('scenes/left12.jpg', 0)
+    img = cv2.imread('scenes/left1.jpg', 0)
     found, final = search_scene(img, None)
     print found
     plt.imshow(final, cmap=plt.cm.Greys_r)

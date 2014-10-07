@@ -18,8 +18,8 @@ def find_features(filename):
 def find_all_features(prefix):
     pattern = prefix + '*.jpg'
     for name in sorted(glob.glob(pattern)):
-	kps,ds = find_features(name)
-	yield name,kps,ds
+        kps,ds = find_features(name)
+        yield name,kps,ds
 
 
 def save_features(filename, features):
@@ -27,21 +27,21 @@ def save_features(filename, features):
 
     serialised = {}
     for name,kps,ds in features:
-	kps_serial = [(kp.pt[0], kp.pt[1], kp.size, kp.angle, kp.response,
-		kp.octave, kp.class_id) for kp in kps]
-	serialised[name] = (kps_serial,ds)
+        kps_serial = [(kp.pt[0], kp.pt[1], kp.size, kp.angle, kp.response,
+                kp.octave, kp.class_id) for kp in kps]
+        serialised[name] = (kps_serial,ds)
 
     with open(filename, 'wb') as f:
-	pickle.dump(serialised, f)
+        pickle.dump(serialised, f)
 
 
 def load_features(filename):
     with open(filename, 'r') as f:
-	features = pickle.load(f)
-	for name in features:
-	    kps_serial,ds = features[name]
-	    kps = [cv2.KeyPoint(*kp) for kp in kps_serial]
-	    features[name] = (kps,ds)
+        features = pickle.load(f)
+        for name in features:
+            kps_serial,ds = features[name]
+            kps = [cv2.KeyPoint(*kp) for kp in kps_serial]
+            features[name] = (kps,ds)
 
     return features
 

@@ -26,8 +26,8 @@ def calibrate_stereo(left_filenames, right_filenames):
     img_pointsR = []
 
     for i in range(len(left_images)):
-	nameL = left_images[i]
-	nameR = right_images[i]
+        nameL = left_images[i]
+        nameR = right_images[i]
 
         imgL = cv2.imread(nameL, 0)
         imgR = cv2.imread(nameR, 0)
@@ -35,28 +35,28 @@ def calibrate_stereo(left_filenames, right_filenames):
         retL, cornersL = cv2.findChessboardCorners(imgL, (8,6), None)
         retR, cornersR = cv2.findChessboardCorners(imgR, (8,6), None)
 
-	if retL and retR:
+        if retL and retR:
             obj_points.append(objp)
-	    cv2.cornerSubPix(imgL, cornersL, (11,11), (-1,-1), criteria)
+            cv2.cornerSubPix(imgL, cornersL, (11,11), (-1,-1), criteria)
             img_pointsL.append(cornersL)
-	    cv2.cornerSubPix(imgR, cornersR, (11,11), (-1,-1), criteria)
+            cv2.cornerSubPix(imgR, cornersR, (11,11), (-1,-1), criteria)
             img_pointsR.append(cornersR)
-	    yield False, True, (nameL,cornersL), (nameR,cornersR)
-	else:
-	    yield False, False, (nameL,None), (nameR,None)
+            yield False, True, (nameL,cornersL), (nameR,cornersR)
+        else:
+            yield False, False, (nameL,None), (nameR,None)
 
     image_size = imgL.shape[::-1]
 
     # Find individual intrinsic parameters first
     retL, matrixL, distL, rvecsL, tvecsL = cv2.calibrateCamera(
-	    obj_points, img_pointsL, image_size, None, None)
+            obj_points, img_pointsL, image_size, None, None)
     retR, matrixR, distR, rvecsR, tvecsR = cv2.calibrateCamera(
-	    obj_points, img_pointsR, image_size, None, None)
+            obj_points, img_pointsR, image_size, None, None)
 
     # Calibrate stereo camera, with calculated intrinsic parameters
     ret, matrixL, distL, matrixR, distR, R, T, E, F = cv2.stereoCalibrate(
-	    obj_points, img_pointsL, img_pointsR, image_size,
-	    matrixL, distL, matrixR, distR, flags=cv2.CALIB_FIX_INTRINSIC)
+            obj_points, img_pointsL, img_pointsR, image_size,
+            matrixL, distL, matrixR, distR, flags=cv2.CALIB_FIX_INTRINSIC)
 
     # Calculate rectification transforms for each camera
     R1 = np.zeros((3,3), np.float32)
@@ -65,23 +65,23 @@ def calibrate_stereo(left_filenames, right_filenames):
     P2 = np.zeros((3,4), np.float32)
     Q = np.zeros((4,4), np.float32)
     R1, R2, P1, P2, Q, roiL, roiR = cv2.stereoRectify(
-	    matrixL, distL, matrixR, distR, image_size, R, T)
+            matrixL, distL, matrixR, distR, image_size, R, T)
 
     # Create undistortion/rectification map for each camera
     mapsL = cv2.initUndistortRectifyMap(matrixL, distL, R1, P1,
-	    image_size, cv2.CV_32FC1)
+            image_size, cv2.CV_32FC1)
     mapsR = cv2.initUndistortRectifyMap(matrixR, distR, R2, P2,
-	    image_size, cv2.CV_32FC1)
+            image_size, cv2.CV_32FC1)
 
     # Convert maps to fixed-point representation (faster)
     mapsL = cv2.convertMaps(mapsL[0], mapsL[1], cv2.CV_32FC1)
     mapsR = cv2.convertMaps(mapsR[0], mapsR[1], cv2.CV_32FC1)
 
     calib = {
-	"intrinsicL": matrixL, "intrinsicR": matrixR,
-	"mapsL": mapsL, "mapsR": mapsR,
-	"R1": R1, "R2": R2, "P1": P1, "P2": P2, "Q": Q,
-	"roiL": roiL, "roiR": roiR
+        "intrinsicL": matrixL, "intrinsicR": matrixR,
+        "mapsL": mapsL, "mapsR": mapsR,
+        "R1": R1, "R2": R2, "P1": P1, "P2": P2, "Q": Q,
+        "roiL": roiL, "roiR": roiR
     }
     yield True, calib, None, None
 
@@ -138,12 +138,12 @@ def load_calibration(filename):
 if __name__ == '__main__':
     #matrix = np.array([])
     #for done,mtx,r,c in calibrate_camera('calibration/*left*'):
-	#if done:
-	    #matrix = mtx
+        #if done:
+            #matrix = mtx
     #save_calibration('calibration/left.txt', matrix)
     #print load_calibration('calibration/left.txt')
 
     for a in calibrate_stereo('calibration/*left*.jpg', 'calibration/*right*.jpg'):
-	print a[0]
-	if a[0]:
-	    print a[1]
+        print a[0]
+        if a[0]:
+            print a[1]
