@@ -130,7 +130,7 @@ class CalibrateMode(tk.Frame):
                 self.status.update_idletasks()
                 self.status.see(tk.END)
                 self.status.itemconfig(tk.END, {'fg':'red'}) 
-        
+
         text = "{0} images processed".format(len(self.images))
         self.status.insert(tk.END, text)
         text = "{0} matching chessboards found".format(count)
@@ -152,7 +152,7 @@ class CalibrateMode(tk.Frame):
         self.display_matrix("Right intrinsic matrix:", calib["intrinsicR"])
         self.status.insert(tk.END, "Undistort/rectify maps also calculated")
         self.status.see(tk.END)
-        
+
 
     def select_image(self, event):
         selected = int(self.status.curselection()[0])
@@ -189,8 +189,8 @@ class CalibrateMode(tk.Frame):
         self.status.insert(tk.END, text)
         self.status.see(tk.END)
 
-        matrix = load_calibration(filename)
-        self.set_matrix(matrix)
+        calib = load_calibration(filename)
+        self.set_calib(calib)
 
 
     def save_calibration(self):
@@ -281,7 +281,6 @@ class FeaturesMode(tk.Frame):
 
 
     def find_features(self, event=None):
-        self.save_label.config(text="")
         prefix = self.prefix_entry.get()
         self.status.delete(0, tk.END)
         text = "Using prefix {0}".format(prefix)
@@ -323,8 +322,9 @@ class FeaturesMode(tk.Frame):
 
 
     def save_features(self, event=None):
-        filename = tkFileDialog.asksaveasfilename(
-                initialdir='features', defaultextension='.txt')
+        suggested = self.prefix_entry.get().split('/')[-1] + '.txt'
+        filename = tkFileDialog.asksaveasfilename(defaultextension='.txt',
+                initialdir='features', initialfile=suggested)
         if not filename:
             return
 
@@ -332,10 +332,10 @@ class FeaturesMode(tk.Frame):
         save_features(filename, features)
         text = "Saved as {0}".format(filename.split(os.path.sep)[-1])
         self.status.insert(tk.END, text)
+        self.status.see(tk.END)
 
 
     def load_features(self, event=None):
-        self.save_label.config(text="")
         filename = tkFileDialog.askopenfilename(
                 initialdir='features', defaultextension='.txt')
         if not filename:
@@ -454,6 +454,8 @@ class SearchMode(tk.Frame):
             img = self.left
         elif x == 0 and y == 1:
             img = self.right
+        elif x == 1 and y == 0:
+            img = self.disparity
         elif x == 1 and y == 1:
             kwargs["cmap"] = plt.cm.Greys_r
             img = self.final
@@ -476,9 +478,11 @@ class SearchMode(tk.Frame):
         if axis == 0:
             which = "left"
             self.left = img
+            self.left_filename = filename
         else:
             which = "right"
             self.right = img
+            self.right_filename = filename
 
         self.draw_image(0, axis)
         short = filename.split(os.path.sep)[-1]
@@ -507,10 +511,8 @@ class SearchMode(tk.Frame):
         imgR = cv2.cvtColor(self.right, cv2.COLOR_BGR2GRAY)
         disparity = calculate_disparity_map(imgL, imgR)
         norm = 255 / disparity.max()
-        self.axes[1][0].clear()
-        self.axes[1][0].imshow(disparity)
-        self.axes[1][0].set_axis_off()
-        self.canvas.draw()
+        self.disparity = disparity
+        self.draw_image(1,0)
 
 
     def rectify_source_images(self):
@@ -537,10 +539,15 @@ class SearchMode(tk.Frame):
         self.status.insert(tk.END, text)
 
         self.rectify_source_images()
-        disparity = self.find_disparity_map()
-        img = cv2.cvtColor(self.right, cv2.COLOR_BGR2GRAY)
-        self.cups, self.final = search_scene(img, disparity)
-        
+        self.find_disparity_map()
+        self.cups, self.final = search_scene(self.right_filename,
+                self.disparity, self.calib)
+
+        for cup in self.cups:
+            dst = cup["dst"]
+            cv2.polylines(self.disparity, [np.int32(dst)], True, 255, 3)
+        self.draw_image(1,0)
+
         text = "Found {0} cups".format(len(self.cups))
         self.status.insert(tk.END, text)
         self.draw_image(1,1)
